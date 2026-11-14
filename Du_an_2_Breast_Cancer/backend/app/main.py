@@ -33,7 +33,7 @@ for import_path in (PROJECT_DIR, REPO_ROOT):
     if str(import_path) not in sys.path:
         sys.path.append(str(import_path))
 
-from app.history import history_request
+from .history import history_request
 from shared.auth import get_current_user
 
 
