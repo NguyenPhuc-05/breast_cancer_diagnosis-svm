@@ -1,0 +1,51 @@
+envVarGroups:
+  - name: bc-storage
+    envVars:
+      - key: BC_DATA_TOKEN
+        generateValue: true
+
+services:
+  - type: web
+    name: bc-svm-data
+    runtime: python
+    plan: free
+    buildCommand: pip install -r Du_an_2_Breast_Cancer/database/requirements.txt
+    startCommand: uvicorn database.service:app --app-dir Du_an_2_Breast_Cancer --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - fromGroup: bc-storage
+
+  - type: web
+    name: bc-svm-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r Du_an_2_Breast_Cancer/backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --app-dir Du_an_2_Breast_Cancer --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: CLIENT_ID
+        value: project-two-api
+      - key: FRONTEND_ORIGINS
+        value: https://bc-svm-frontend.onrender.com
+      - key: BC_DATA_URL
+        value: https://bc-svm-data.onrender.com
+      - key: JWT_SECRET
+        sync: false
+      - fromGroup: bc-storage
+
+  - type: web
+    name: bc-svm-frontend
+    runtime: static
+    plan: free
+    rootDir: Du_an_2_Breast_Cancer/frontend
+    buildCommand: node build-config.mjs
+    staticPublishPath: .
+    envVars:
+      - key: BC_API_URL
+        value: https://bc-svm-api.onrender.com
+      - key: IDP_API_URL
+        value: https://identity-service-v2.onrender.com
