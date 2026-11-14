@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Minh hoạ SVM dự đoán ung thư vú cho mục đích học tập.">
+    <title>Breast Cancer SVM · Dự án 2</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="deployment-config.js"></script>
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Bỏ qua điều hướng</a>
+
+    <header class="app-header">
+        <a class="brand" href="#predict" aria-label="Breast Cancer SVM - Trang dự đoán">
+            <span class="brand-mark" aria-hidden="true">BC</span>
+            <span><strong>Breast Cancer SVM</strong><small>Dự án 2 · Học máy nâng cao</small></span>
+        </a>
+        <div class="header-actions">
+            <span id="service-status" class="status-pill" aria-live="polite">Đang kiểm tra API…</span>
+            <button id="open-auth" class="button button-secondary" type="button">Đăng nhập</button>
+            <button id="account-button" class="account-button is-hidden" type="button" data-tab-target="profile">
+                <span class="avatar" aria-hidden="true">U</span><span id="account-email">Tài khoản</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="warning-banner" role="note">
+        <strong>Chỉ dùng cho giáo dục.</strong>
+        Kết quả không phải chẩn đoán y khoa và không thay thế bác sĩ hoặc xét nghiệm lâm sàng.
+    </div>
+
+    <nav class="tab-bar" aria-label="Điều hướng chính">
+        <button class="tab-button is-active" type="button" data-tab="predict">Dự đoán</button>
+        <button class="tab-button" type="button" data-tab="metrics">Đánh giá mô hình</button>
+        <button class="tab-button auth-only is-hidden" type="button" data-tab="history">Lịch sử</button>
+        <button class="tab-button auth-only is-hidden" type="button" data-tab="profile">Hồ sơ</button>
+        <button class="tab-button owner-only is-hidden" type="button" data-tab="admin">Quản trị</button>
+        <button class="tab-button" type="button" data-tab="about">Giới thiệu & cảnh báo</button>
+    </nav>
+
+    <main id="main-content" tabindex="-1">
+        <section id="panel-predict" class="tab-panel is-active" data-panel="predict">
+            <div class="hero">
+                <div>
+                    <p class="eyebrow">Wisconsin Diagnostic Breast Cancer</p>
+                    <h1>Ước lượng nguy cơ từ 30 đặc trưng</h1>
+                    <p>Mô hình SVM RBF đã chuẩn hoá dữ liệu. Ngưỡng quyết định được khoá từ dự đoán out-of-fold trên tập huấn luyện.</p>
+                </div>
+                <div class="hero-stat">
+                    <span>Ngưỡng ác tính</span>
+                    <strong id="hero-threshold">—</strong>
+                    <small>P(ác tính) ≥ ngưỡng</small>
+                </div>
+            </div>
+
+            <div id="login-required" class="callout callout-info">
+                <div><strong>Cần đăng nhập để dự đoán</strong><span>Tài khoản dùng chung với dịch vụ định danh của các dự án.</span></div>
+                <button class="button button-primary" type="button" data-open-auth>Đăng nhập / Đăng ký</button>
+            </div>
+
+            <form id="prediction-form" class="prediction-layout" novalidate>
+                <div class="feature-workspace">
+                    <div class="section-heading">
+                        <div><p class="eyebrow">Dữ liệu đầu vào</p><h2>30 phép đo</h2></div>
+                        <div class="preset-actions">
+                            <button id="load-benign" class="button button-soft" type="button">Mẫu lành tính</button>
+                            <button id="load-malignant" class="button button-soft danger-soft" type="button">Mẫu ác tính</button>
+                        </div>
+                    </div>
+                    <p class="field-note">Không nhập tên, mã bệnh nhân hay bất kỳ thông tin nhận dạng cá nhân nào.</p>
+                    <div id="feature-groups"></div>
+                    <div id="form-error" class="form-message" role="alert"></div>
+                    <div class="form-actions">
+                        <button id="predict-button" class="button button-primary button-large" type="submit">Phân tích mẫu</button>
+                        <button id="reset-button" class="button button-secondary button-large" type="reset">Đặt lại</button>
+                    </div>
+                </div>
+
+                <aside class="result-column" aria-live="polite">
+                    <div id="result-empty" class="result-card result-empty">
+                        <span class="result-icon" aria-hidden="true">◎</span>
+                        <h2>Kết quả sẽ xuất hiện tại đây</h2>
+                        <p>Điền đủ 30 giá trị hoặc nạp một mẫu minh hoạ, sau đó chọn “Phân tích mẫu”.</p>
+                    </div>
+                    <div id="result-card" class="result-card is-hidden">
+                        <p class="eyebrow">Kết quả mô hình</p>
+                        <div id="result-badge" class="result-badge">—</div>
+                        <h2 id="result-title">—</h2>
+                        <p id="result-decision" class="result-decision">—</p>
+                        <div class="probability-block">
+                            <div><span>Xác suất ác tính</span><strong id="probability-malignant">—</strong></div>
+                            <div class="progress"><span id="malignant-bar"></span></div>
+                        </div>
+                        <div class="probability-block benign-block">
+                            <div><span>Xác suất lành tính</span><strong id="probability-benign">—</strong></div>
+                            <div class="progress"><span id="benign-bar"></span></div>
+                        </div>
+                        <dl class="result-meta">
+                            <div><dt>Ngưỡng</dt><dd id="result-threshold">—</dd></div>
+                            <div><dt>Phiên bản</dt><dd id="result-version">—</dd></div>
+                        </dl>
+                        <p id="result-warning" class="inline-warning"></p>
+                    </div>
+                </aside>
+            </form>
+        </section>
+
+        <section id="panel-metrics" class="tab-panel" data-panel="metrics">
+            <div class="page-heading"><p class="eyebrow">Hiệu năng đã khoá</p><h1>Đánh giá mô hình</h1><p>Các chỉ số test chỉ được tính một lần sau khi chọn mô hình và ngưỡng trên dữ liệu huấn luyện.</p></div>
+            <div id="metrics-loading" class="loading-card">Đang tải chỉ số…</div>
+            <div id="metrics-content" class="is-hidden">
+                <div id="metric-cards" class="metric-grid"></div>
+                <div class="evaluation-grid">
+                    <article class="card">
+                        <div class="section-heading"><div><p class="eyebrow">Tập kiểm tra</p><h2>Ma trận nhầm lẫn</h2></div></div>
+                        <div class="confusion-wrap">
+                            <div class="confusion-axis">Dự đoán</div>
+                            <div id="confusion-matrix" class="confusion-matrix"></div>
+                            <div class="confusion-caption">Hàng: nhãn thật · Cột: nhãn dự đoán</div>
+                        </div>
+                    </article>
+                    <article class="card">
+                        <p class="eyebrow">Tính tổng quát</p><h2>CV so với Test</h2>
+                        <div id="comparison-bars" class="comparison-bars"></div>
+                    </article>
+                    <article class="card threshold-card">
+                        <p class="eyebrow">Quy tắc quyết định</p><h2>Ngưỡng độ nhạy cao</h2>
+                        <strong id="metrics-threshold" class="large-number">—</strong>
+                        <p id="threshold-description">—</p>
+                    </article>
+                    <article class="card">
+                        <p class="eyebrow">Cấu hình</p><h2>Mô hình được chọn</h2>
+                        <dl id="model-details" class="detail-list"></dl>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="panel-history" class="tab-panel" data-panel="history">
+            <div class="page-heading split-heading">
+                <div><p class="eyebrow">Dữ liệu cá nhân</p><h1>Lịch sử dự đoán</h1><p>Chỉ tài khoản của bạn nhìn thấy các bản ghi này.</p></div>
+                <div class="heading-actions">
+                    <button id="export-history" class="button button-secondary" type="button">Xuất Excel</button>
+                    <button id="clear-history" class="button button-danger" type="button">Xoá tất cả</button>
+                </div>
+            </div>
+            <div id="history-message" class="form-message" role="status"></div>
+            <div class="table-card"><div class="table-scroll"><table><thead><tr><th>Thời gian</th><th>Kết quả</th><th>P(ác tính)</th><th>P(lành tính)</th><th>Ngưỡng</th><th>Phiên bản</th></tr></thead><tbody id="history-body"></tbody></table></div><div id="history-empty" class="empty-state">Chưa có dự đoán nào.</div></div>
+        </section>
+
+        <section id="panel-profile" class="tab-panel" data-panel="profile">
+            <div class="page-heading"><p class="eyebrow">Tài khoản dùng chung</p><h1>Hồ sơ</h1></div>
+            <div class="profile-grid">
+                <article class="card profile-card"><div class="profile-avatar" id="profile-avatar">U</div><div><h2 id="profile-email">—</h2><span id="profile-role" class="role-badge">Người dùng</span></div></article>
+                <article class="card"><p class="eyebrow">Mã người dùng</p><p id="profile-id" class="mono-value">—</p></article>
+                <article class="card"><p class="eyebrow">Số dự đoán</p><strong id="profile-count" class="large-number">—</strong></article>
+                <article class="card profile-actions"><p>Đăng xuất sẽ xoá JWT khỏi trình duyệt này.</p><button id="logout-button" class="button button-danger" type="button">Đăng xuất</button></article>
+            </div>
+        </section>
+
+        <section id="panel-admin" class="tab-panel" data-panel="admin">
+            <div class="page-heading"><p class="eyebrow">Chỉ dành cho chủ sở hữu</p><h1>Quản trị</h1><p>Dữ liệu dự đoán không kèm định danh bệnh nhân; tài khoản được lấy trực tiếp từ IdP.</p></div>
+            <div id="admin-message" class="form-message" role="status"></div>
+            <div class="admin-grid">
+                <article class="table-card"><div class="table-title"><h2>Người dùng IdP</h2><span id="admin-user-count">—</span></div><div class="table-scroll"><table><thead><tr><th>Email</th><th>ID</th><th>Vai trò</th><th>Đăng nhập gần nhất</th></tr></thead><tbody id="admin-users-body"></tbody></table></div></article>
+                <article class="table-card"><div class="table-title"><h2>Tất cả dự đoán</h2><span id="admin-prediction-count">—</span></div><div class="table-scroll"><table><thead><tr><th>Thời gian</th><th>Kết quả</th><th>P(ác tính)</th><th>Ngưỡng</th><th>Phiên bản</th></tr></thead><tbody id="admin-predictions-body"></tbody></table></div></article>
+            </div>
+        </section>
+
+        <section id="panel-about" class="tab-panel" data-panel="about">
+            <div class="page-heading"><p class="eyebrow">Minh bạch mô hình</p><h1>Giới thiệu và cảnh báo</h1></div>
+            <div class="about-grid">
+                <article class="card accent-card"><h2>Mục đích</h2><p>Ứng dụng minh hoạ quy trình học máy có xác thực, API độc lập, lưu lịch sử tách biệt và triển khai đa dịch vụ.</p></article>
+                <article class="card"><h2>Giới hạn dữ liệu</h2><p>Mô hình dùng bộ Wisconsin Diagnostic Breast Cancer tích hợp trong scikit-learn. Chưa có kiểm định ngoài, kiểm định theo bệnh viện hoặc đánh giá lâm sàng.</p></article>
+                <article class="card"><h2>Diễn giải xác suất</h2><p>Xác suất do SVC hiệu chỉnh nội bộ cung cấp, không phải nguy cơ mắc bệnh trong dân số. Ngưỡng được ưu tiên độ nhạy ác tính trên dự đoán out-of-fold.</p></article>
+                <article class="card"><h2>Quyền riêng tư</h2><p>Không nhập dữ liệu nhận dạng. Lịch sử chỉ lưu 30 đặc trưng số, kết quả, xác suất, ngưỡng và phiên bản mô hình.</p></article>
+                <article class="card warning-card"><h2>Không dùng để điều trị</h2><p>Không trì hoãn, thay đổi hoặc bắt đầu điều trị dựa trên kết quả của ứng dụng này. Hãy trao đổi với chuyên gia y tế có thẩm quyền.</p></article>
+                <article class="card"><h2>Khả dụng dịch vụ</h2><p>Gói miễn phí có thể ngủ khi không hoạt động. API sẽ đánh thức dịch vụ dữ liệu; dự đoán vẫn được trả về nếu phần lưu lịch sử tạm thời không sẵn sàng.</p></article>
+            </div>
+        </section>
+    </main>
+
+    <footer><span>Breast Cancer SVM · Project 2</span><span>Mô hình giáo dục — không phải thiết bị y tế</span></footer>
+
+    <div id="auth-overlay" class="auth-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <div class="auth-card">
+            <button id="close-auth" class="icon-button" type="button" aria-label="Đóng">×</button>
+            <span class="auth-logo" aria-hidden="true">BC</span>
+            <p class="eyebrow">Identity Service</p>
+            <h2 id="auth-title">Đăng nhập</h2>
+            <p id="auth-subtitle">Dùng tài khoản chung để lưu lịch sử riêng tư.</p>
+            <form id="auth-form" novalidate>
+                <label>Email<input id="auth-email" type="email" autocomplete="email" required></label>
+                <label>Mật khẩu<span class="password-wrap"><input id="auth-password" type="password" autocomplete="current-password" minlength="8" required><button id="toggle-password" type="button" aria-label="Hiện mật khẩu">Hiện</button></span></label>
+                <div id="auth-error" class="form-message" role="alert"></div>
+                <button id="auth-submit" class="button button-primary button-full" type="submit">Đăng nhập</button>
+            </form>
+            <button id="auth-switch" class="link-button" type="button">Chưa có tài khoản? Đăng ký</button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
