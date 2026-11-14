@@ -40,7 +40,6 @@ services:
   - type: web
     name: bc-svm-frontend
     runtime: static
-    plan: free
     rootDir: Du_an_2_Breast_Cancer/frontend
     buildCommand: node build-config.mjs
     staticPublishPath: .
