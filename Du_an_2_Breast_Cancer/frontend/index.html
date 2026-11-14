@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Minh hoạ SVM dự đoán ung thư vú cho mục đích học tập.">
+    <meta name="description" content="Chẩn đoán ung thư vú bằng SVM — minh hoạ học máy cho mục đích giáo dục.">
     <title>Breast Cancer SVM · Dự án 2</title>
     <link rel="stylesheet" href="style.css">
     <script src="deployment-config.js"></script>
@@ -11,179 +11,408 @@
 </head>
 <body>
     <a class="skip-link" href="#main-content">Bỏ qua điều hướng</a>
+    <canvas id="confetti-canvas" aria-hidden="true"></canvas>
 
+    <!-- ── Header ────────────────────────────────────────── -->
     <header class="app-header">
-        <a class="brand" href="#predict" aria-label="Breast Cancer SVM - Trang dự đoán">
+        <a class="brand" href="#predict" aria-label="Breast Cancer SVM — Trang dự đoán">
             <span class="brand-mark" aria-hidden="true">BC</span>
-            <span><strong>Breast Cancer SVM</strong><small>Dự án 2 · Học máy nâng cao</small></span>
+            <span>
+                <strong>Breast Cancer SVM</strong>
+                <small>Dự án 2 · Học máy nâng cao</small>
+            </span>
         </a>
         <div class="header-actions">
             <span id="service-status" class="status-pill" aria-live="polite">Đang kiểm tra API…</span>
-            <button id="open-auth" class="button button-secondary" type="button">Đăng nhập</button>
+            <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Chuyển chế độ tối/sáng" title="Chuyển chế độ tối/sáng">🌙</button>
+            <button id="open-auth" class="button button-primary" type="button">Đăng nhập</button>
             <button id="account-button" class="account-button is-hidden" type="button" data-tab-target="profile">
-                <span class="avatar" aria-hidden="true">U</span><span id="account-email">Tài khoản</span>
+                <span class="avatar" aria-hidden="true">U</span>
+                <span id="account-email">Tài khoản</span>
             </button>
         </div>
     </header>
 
+    <!-- ── Medical warning ───────────────────────────────── -->
     <div class="warning-banner" role="note">
-        <strong>Chỉ dùng cho giáo dục.</strong>
-        Kết quả không phải chẩn đoán y khoa và không thay thế bác sĩ hoặc xét nghiệm lâm sàng.
+        <strong>⚠ Chỉ dùng cho giáo dục.</strong>
+        Kết quả <em>không phải</em> chẩn đoán y khoa và không thay thế bác sĩ hoặc xét nghiệm lâm sàng.
     </div>
 
+    <!-- ── Tab navigation ────────────────────────────────── -->
     <nav class="tab-bar" aria-label="Điều hướng chính">
-        <button class="tab-button is-active" type="button" data-tab="predict">Dự đoán</button>
-        <button class="tab-button" type="button" data-tab="metrics">Đánh giá mô hình</button>
-        <button class="tab-button auth-only is-hidden" type="button" data-tab="history">Lịch sử</button>
-        <button class="tab-button auth-only is-hidden" type="button" data-tab="profile">Hồ sơ</button>
-        <button class="tab-button owner-only is-hidden" type="button" data-tab="admin">Quản trị</button>
-        <button class="tab-button" type="button" data-tab="about">Giới thiệu & cảnh báo</button>
+        <button class="tab-button is-active" type="button" data-tab="predict">🔬 Dự đoán</button>
+        <button class="tab-button" type="button" data-tab="metrics">📊 Đánh giá mô hình</button>
+        <button class="tab-button auth-only is-hidden" type="button" data-tab="history">📋 Lịch sử</button>
+        <button class="tab-button auth-only is-hidden" type="button" data-tab="profile">👤 Hồ sơ</button>
+        <button class="tab-button owner-only is-hidden" type="button" data-tab="admin">🛡 Quản trị</button>
+        <button class="tab-button" type="button" data-tab="about">ℹ Giới thiệu</button>
     </nav>
 
+    <!-- ── Main content ──────────────────────────────────── -->
     <main id="main-content" tabindex="-1">
+
+        <!-- ═══════════════ TAB: DỰ ĐOÁN ═══════════════════ -->
         <section id="panel-predict" class="tab-panel is-active" data-panel="predict">
+
+            <!-- Hero -->
             <div class="hero">
-                <div>
+                <div class="hero-left">
                     <p class="eyebrow">Wisconsin Diagnostic Breast Cancer</p>
                     <h1>Ước lượng nguy cơ từ 30 đặc trưng</h1>
-                    <p>Mô hình SVM RBF đã chuẩn hoá dữ liệu. Ngưỡng quyết định được khoá từ dự đoán out-of-fold trên tập huấn luyện.</p>
+                    <p>Mô hình SVM nhân RBF được chuẩn hoá và tinh chỉnh ngưỡng độ nhạy cao từ dự đoán out-of-fold.</p>
                 </div>
-                <div class="hero-stat">
-                    <span>Ngưỡng ác tính</span>
-                    <strong id="hero-threshold">—</strong>
-                    <small>P(ác tính) ≥ ngưỡng</small>
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <span>Ngưỡng ác tính</span>
+                        <strong id="hero-threshold">—</strong>
+                        <small>P(ác tính) ≥ ngưỡng</small>
+                    </div>
+                    <div class="hero-stat">
+                        <span>Độ nhạy CV</span>
+                        <strong id="hero-sensitivity">—</strong>
+                        <small>OOF cross-validation</small>
+                    </div>
                 </div>
             </div>
 
+            <!-- Login required callout -->
             <div id="login-required" class="callout callout-info">
-                <div><strong>Cần đăng nhập để dự đoán</strong><span>Tài khoản dùng chung với dịch vụ định danh của các dự án.</span></div>
+                <div>
+                    <strong>Cần đăng nhập để dự đoán</strong>
+                    <span>Tài khoản dùng chung với dịch vụ định danh của các dự án.</span>
+                </div>
                 <button class="button button-primary" type="button" data-open-auth>Đăng nhập / Đăng ký</button>
             </div>
 
+            <!-- Prediction form -->
             <form id="prediction-form" class="prediction-layout" novalidate>
+                <!-- Left: inputs -->
                 <div class="feature-workspace">
                     <div class="section-heading">
-                        <div><p class="eyebrow">Dữ liệu đầu vào</p><h2>30 phép đo</h2></div>
+                        <div>
+                            <p class="eyebrow">Dữ liệu đầu vào</p>
+                            <h2>30 phép đo tế bào</h2>
+                        </div>
                         <div class="preset-actions">
-                            <button id="load-benign" class="button button-soft" type="button">Mẫu lành tính</button>
-                            <button id="load-malignant" class="button button-soft danger-soft" type="button">Mẫu ác tính</button>
+                            <button id="load-benign" class="button button-soft" type="button">✅ Mẫu lành tính</button>
+                            <button id="load-malignant" class="button danger-soft" type="button">⚠ Mẫu ác tính</button>
                         </div>
                     </div>
                     <p class="field-note">Không nhập tên, mã bệnh nhân hay bất kỳ thông tin nhận dạng cá nhân nào.</p>
                     <div id="feature-groups"></div>
                     <div id="form-error" class="form-message" role="alert"></div>
                     <div class="form-actions">
-                        <button id="predict-button" class="button button-primary button-large" type="submit">Phân tích mẫu</button>
-                        <button id="reset-button" class="button button-secondary button-large" type="reset">Đặt lại</button>
+                        <button id="predict-button" class="button button-primary button-large" type="submit">🔬 Phân tích mẫu</button>
+                        <button id="reset-button" class="button button-secondary button-large" type="reset">↺ Đặt lại</button>
                     </div>
                 </div>
 
+                <!-- Right: result + radar -->
                 <aside class="result-column" aria-live="polite">
+                    <!-- Empty state -->
                     <div id="result-empty" class="result-card result-empty">
                         <span class="result-icon" aria-hidden="true">◎</span>
                         <h2>Kết quả sẽ xuất hiện tại đây</h2>
-                        <p>Điền đủ 30 giá trị hoặc nạp một mẫu minh hoạ, sau đó chọn “Phân tích mẫu”.</p>
+                        <p>Điền đủ 30 giá trị hoặc nạp một mẫu minh hoạ, sau đó chọn "Phân tích mẫu".</p>
                     </div>
+
+                    <!-- Result card -->
                     <div id="result-card" class="result-card is-hidden">
                         <p class="eyebrow">Kết quả mô hình</p>
                         <div id="result-badge" class="result-badge">—</div>
                         <h2 id="result-title">—</h2>
                         <p id="result-decision" class="result-decision">—</p>
+
                         <div class="probability-block">
-                            <div><span>Xác suất ác tính</span><strong id="probability-malignant">—</strong></div>
+                            <div>
+                                <span>Xác suất ác tính</span>
+                                <strong id="probability-malignant">—</strong>
+                            </div>
                             <div class="progress"><span id="malignant-bar"></span></div>
                         </div>
                         <div class="probability-block benign-block">
-                            <div><span>Xác suất lành tính</span><strong id="probability-benign">—</strong></div>
+                            <div>
+                                <span>Xác suất lành tính</span>
+                                <strong id="probability-benign">—</strong>
+                            </div>
                             <div class="progress"><span id="benign-bar"></span></div>
                         </div>
+
                         <dl class="result-meta">
                             <div><dt>Ngưỡng</dt><dd id="result-threshold">—</dd></div>
                             <div><dt>Phiên bản</dt><dd id="result-version">—</dd></div>
                         </dl>
                         <p id="result-warning" class="inline-warning"></p>
+                        <button class="copy-result-btn" id="copy-result" type="button">📋 Sao chép kết quả</button>
+                    </div>
+
+                    <!-- Radar chart -->
+                    <div class="radar-wrap is-hidden" id="radar-wrap">
+                        <p class="eyebrow">Phân tích đặc trưng</p>
+                        <canvas id="radar-canvas" width="320" height="260" aria-label="Biểu đồ radar 30 đặc trưng"></canvas>
                     </div>
                 </aside>
             </form>
         </section>
 
+        <!-- ═══════════════ TAB: ĐÁNH GIÁ ══════════════════ -->
         <section id="panel-metrics" class="tab-panel" data-panel="metrics">
-            <div class="page-heading"><p class="eyebrow">Hiệu năng đã khoá</p><h1>Đánh giá mô hình</h1><p>Các chỉ số test chỉ được tính một lần sau khi chọn mô hình và ngưỡng trên dữ liệu huấn luyện.</p></div>
+            <div class="page-heading">
+                <p class="eyebrow">Hiệu năng đã khoá</p>
+                <h1>Đánh giá mô hình</h1>
+                <p>Các chỉ số test chỉ được tính một lần sau khi chọn mô hình và ngưỡng trên dữ liệu huấn luyện.</p>
+            </div>
             <div id="metrics-loading" class="loading-card">Đang tải chỉ số…</div>
             <div id="metrics-content" class="is-hidden">
                 <div id="metric-cards" class="metric-grid"></div>
                 <div class="evaluation-grid">
                     <article class="card">
-                        <div class="section-heading"><div><p class="eyebrow">Tập kiểm tra</p><h2>Ma trận nhầm lẫn</h2></div></div>
+                        <div class="section-heading">
+                            <div>
+                                <p class="eyebrow">Tập kiểm tra</p>
+                                <h2>Ma trận nhầm lẫn</h2>
+                            </div>
+                        </div>
                         <div class="confusion-wrap">
-                            <div class="confusion-axis">Dự đoán</div>
+                            <div class="confusion-axis">Dự đoán →</div>
                             <div id="confusion-matrix" class="confusion-matrix"></div>
                             <div class="confusion-caption">Hàng: nhãn thật · Cột: nhãn dự đoán</div>
                         </div>
                     </article>
                     <article class="card">
-                        <p class="eyebrow">Tính tổng quát</p><h2>CV so với Test</h2>
+                        <p class="eyebrow">Tính tổng quát hoá</p>
+                        <h2>OOF-CV so với Test</h2>
                         <div id="comparison-bars" class="comparison-bars"></div>
                     </article>
                     <article class="card threshold-card">
-                        <p class="eyebrow">Quy tắc quyết định</p><h2>Ngưỡng độ nhạy cao</h2>
+                        <p class="eyebrow">Quy tắc quyết định</p>
+                        <h2>Ngưỡng độ nhạy cao</h2>
                         <strong id="metrics-threshold" class="large-number">—</strong>
                         <p id="threshold-description">—</p>
                     </article>
                     <article class="card">
-                        <p class="eyebrow">Cấu hình</p><h2>Mô hình được chọn</h2>
+                        <p class="eyebrow">Siêu tham số</p>
+                        <h2>Mô hình được chọn</h2>
                         <dl id="model-details" class="detail-list"></dl>
                     </article>
                 </div>
             </div>
         </section>
 
+        <!-- ═══════════════ TAB: LỊCH SỬ ════════════════════ -->
         <section id="panel-history" class="tab-panel" data-panel="history">
             <div class="page-heading split-heading">
-                <div><p class="eyebrow">Dữ liệu cá nhân</p><h1>Lịch sử dự đoán</h1><p>Chỉ tài khoản của bạn nhìn thấy các bản ghi này.</p></div>
+                <div>
+                    <p class="eyebrow">Dữ liệu cá nhân</p>
+                    <h1>Lịch sử dự đoán</h1>
+                    <p>Chỉ tài khoản của bạn nhìn thấy các bản ghi này.</p>
+                </div>
                 <div class="heading-actions">
-                    <button id="export-history" class="button button-secondary" type="button">Xuất Excel</button>
-                    <button id="clear-history" class="button button-danger" type="button">Xoá tất cả</button>
+                    <button id="export-history" class="button button-secondary" type="button">📥 Xuất Excel</button>
+                    <button id="clear-history" class="button button-danger" type="button">🗑 Xoá tất cả</button>
                 </div>
             </div>
             <div id="history-message" class="form-message" role="status"></div>
-            <div class="table-card"><div class="table-scroll"><table><thead><tr><th>Thời gian</th><th>Kết quả</th><th>P(ác tính)</th><th>P(lành tính)</th><th>Ngưỡng</th><th>Phiên bản</th></tr></thead><tbody id="history-body"></tbody></table></div><div id="history-empty" class="empty-state">Chưa có dự đoán nào.</div></div>
-        </section>
-
-        <section id="panel-profile" class="tab-panel" data-panel="profile">
-            <div class="page-heading"><p class="eyebrow">Tài khoản dùng chung</p><h1>Hồ sơ</h1></div>
-            <div class="profile-grid">
-                <article class="card profile-card"><div class="profile-avatar" id="profile-avatar">U</div><div><h2 id="profile-email">—</h2><span id="profile-role" class="role-badge">Người dùng</span></div></article>
-                <article class="card"><p class="eyebrow">Mã người dùng</p><p id="profile-id" class="mono-value">—</p></article>
-                <article class="card"><p class="eyebrow">Số dự đoán</p><strong id="profile-count" class="large-number">—</strong></article>
-                <article class="card profile-actions"><p>Đăng xuất sẽ xoá JWT khỏi trình duyệt này.</p><button id="logout-button" class="button button-danger" type="button">Đăng xuất</button></article>
+            <div class="table-card">
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Kết quả</th>
+                                <th>P(ác tính)</th>
+                                <th>P(lành tính)</th>
+                                <th>Ngưỡng</th>
+                                <th>Phiên bản</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body"></tbody>
+                    </table>
+                </div>
+                <div id="history-empty" class="empty-state">Chưa có dự đoán nào.</div>
             </div>
         </section>
 
+        <!-- ═══════════════ TAB: HỒ SƠ ══════════════════════ -->
+        <section id="panel-profile" class="tab-panel" data-panel="profile">
+            <div class="page-heading">
+                <p class="eyebrow">Tài khoản dùng chung</p>
+                <h1>Hồ sơ người dùng</h1>
+            </div>
+            <div class="profile-grid">
+                <article class="card profile-card">
+                    <div class="profile-avatar" id="profile-avatar">U</div>
+                    <div>
+                        <h2 id="profile-email">—</h2>
+                        <span id="profile-role" class="role-badge">Người dùng</span>
+                    </div>
+                </article>
+                <article class="card">
+                    <p class="eyebrow">Mã người dùng</p>
+                    <p id="profile-id" class="mono-value">—</p>
+                </article>
+                <article class="card">
+                    <p class="eyebrow">Số lần dự đoán</p>
+                    <strong id="profile-count" class="large-number">—</strong>
+                </article>
+                <article class="card profile-actions">
+                    <p>Đăng xuất sẽ xoá JWT khỏi trình duyệt này.</p>
+                    <button id="logout-button" class="button button-danger" type="button">🚪 Đăng xuất</button>
+                </article>
+            </div>
+        </section>
+
+        <!-- ═══════════════ TAB: QUẢN TRỊ ═══════════════════ -->
         <section id="panel-admin" class="tab-panel" data-panel="admin">
-            <div class="page-heading"><p class="eyebrow">Chỉ dành cho chủ sở hữu</p><h1>Quản trị</h1><p>Dữ liệu dự đoán không kèm định danh bệnh nhân; tài khoản được lấy trực tiếp từ IdP.</p></div>
+            <div class="page-heading">
+                <p class="eyebrow">Chỉ dành cho chủ sở hữu</p>
+                <h1>Quản trị</h1>
+                <p>Dữ liệu dự đoán không kèm định danh bệnh nhân; tài khoản được lấy trực tiếp từ IdP.</p>
+            </div>
             <div id="admin-message" class="form-message" role="status"></div>
             <div class="admin-grid">
-                <article class="table-card"><div class="table-title"><h2>Người dùng IdP</h2><span id="admin-user-count">—</span></div><div class="table-scroll"><table><thead><tr><th>Email</th><th>ID</th><th>Vai trò</th><th>Đăng nhập gần nhất</th></tr></thead><tbody id="admin-users-body"></tbody></table></div></article>
-                <article class="table-card"><div class="table-title"><h2>Tất cả dự đoán</h2><span id="admin-prediction-count">—</span></div><div class="table-scroll"><table><thead><tr><th>Thời gian</th><th>Kết quả</th><th>P(ác tính)</th><th>Ngưỡng</th><th>Phiên bản</th></tr></thead><tbody id="admin-predictions-body"></tbody></table></div></article>
+                <article class="table-card">
+                    <div class="table-title">
+                        <h2>Người dùng IdP</h2>
+                        <span id="admin-user-count">—</span>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead><tr><th>Email</th><th>ID</th><th>Vai trò</th><th>Đăng nhập gần nhất</th></tr></thead>
+                            <tbody id="admin-users-body"></tbody>
+                        </table>
+                    </div>
+                </article>
+                <article class="table-card">
+                    <div class="table-title">
+                        <h2>Tất cả dự đoán</h2>
+                        <span id="admin-prediction-count">—</span>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead><tr><th>Thời gian</th><th>Kết quả</th><th>P(ác tính)</th><th>Ngưỡng</th><th>Phiên bản</th></tr></thead>
+                            <tbody id="admin-predictions-body"></tbody>
+                        </table>
+                    </div>
+                </article>
             </div>
         </section>
 
+        <!-- ═══════════════ TAB: GIỚI THIỆU ══════════════════ -->
         <section id="panel-about" class="tab-panel" data-panel="about">
-            <div class="page-heading"><p class="eyebrow">Minh bạch mô hình</p><h1>Giới thiệu và cảnh báo</h1></div>
-            <div class="about-grid">
-                <article class="card accent-card"><h2>Mục đích</h2><p>Ứng dụng minh hoạ quy trình học máy có xác thực, API độc lập, lưu lịch sử tách biệt và triển khai đa dịch vụ.</p></article>
-                <article class="card"><h2>Giới hạn dữ liệu</h2><p>Mô hình dùng bộ Wisconsin Diagnostic Breast Cancer tích hợp trong scikit-learn. Chưa có kiểm định ngoài, kiểm định theo bệnh viện hoặc đánh giá lâm sàng.</p></article>
-                <article class="card"><h2>Diễn giải xác suất</h2><p>Xác suất do SVC hiệu chỉnh nội bộ cung cấp, không phải nguy cơ mắc bệnh trong dân số. Ngưỡng được ưu tiên độ nhạy ác tính trên dự đoán out-of-fold.</p></article>
-                <article class="card"><h2>Quyền riêng tư</h2><p>Không nhập dữ liệu nhận dạng. Lịch sử chỉ lưu 30 đặc trưng số, kết quả, xác suất, ngưỡng và phiên bản mô hình.</p></article>
-                <article class="card warning-card"><h2>Không dùng để điều trị</h2><p>Không trì hoãn, thay đổi hoặc bắt đầu điều trị dựa trên kết quả của ứng dụng này. Hãy trao đổi với chuyên gia y tế có thẩm quyền.</p></article>
-                <article class="card"><h2>Khả dụng dịch vụ</h2><p>Gói miễn phí có thể ngủ khi không hoạt động. API sẽ đánh thức dịch vụ dữ liệu; dự đoán vẫn được trả về nếu phần lưu lịch sử tạm thời không sẵn sàng.</p></article>
+
+            <!-- About hero -->
+            <div class="about-hero">
+                <p class="eyebrow">Minh bạch mô hình</p>
+                <h1>Giới thiệu dự án</h1>
+                <p>Hệ thống minh hoạ quy trình học máy hoàn chỉnh: từ tiền xử lý dữ liệu, huấn luyện SVM, đến triển khai API và lưu lịch sử người dùng.</p>
             </div>
+
+            <!-- Dataset stats -->
+            <div class="dataset-strip">
+                <div class="dataset-stat">
+                    <strong>569</strong>
+                    <span>Mẫu dữ liệu</span>
+                </div>
+                <div class="dataset-stat">
+                    <strong>30</strong>
+                    <span>Đặc trưng</span>
+                </div>
+                <div class="dataset-stat">
+                    <strong>2</strong>
+                    <span>Lớp phân loại</span>
+                </div>
+                <div class="dataset-stat">
+                    <strong>SVM RBF</strong>
+                    <span>Thuật toán</span>
+                </div>
+            </div>
+
+            <!-- About cards -->
+            <div class="about-grid">
+                <article class="card accent-card">
+                    <div class="about-card-icon">🎯</div>
+                    <h2>Mục đích</h2>
+                    <p>Ứng dụng minh hoạ quy trình học máy có xác thực, API độc lập, lưu lịch sử tách biệt và triển khai đa dịch vụ trên Render.</p>
+                </article>
+                <article class="card">
+                    <div class="about-card-icon">🗄</div>
+                    <h2>Dữ liệu</h2>
+                    <p>Bộ Wisconsin Diagnostic Breast Cancer (WDBC) tích hợp trong scikit-learn gồm 569 mẫu và 30 đặc trưng số được đo từ hình ảnh FNA.</p>
+                    <div class="tech-stack">
+                        <span class="tech-badge">sklearn datasets</span>
+                        <span class="tech-badge">FNA imaging</span>
+                        <span class="tech-badge">569 samples</span>
+                    </div>
+                </article>
+                <article class="card">
+                    <div class="about-card-icon">🤖</div>
+                    <h2>Mô hình SVM</h2>
+                    <p>SVC với nhân RBF, chuẩn hoá StandardScaler, tinh chỉnh siêu tham số qua GridSearchCV và hiệu chỉnh xác suất qua Platt scaling.</p>
+                    <div class="tech-stack">
+                        <span class="tech-badge">SVC (RBF)</span>
+                        <span class="tech-badge">StandardScaler</span>
+                        <span class="tech-badge">GridSearchCV</span>
+                    </div>
+                </article>
+                <article class="card">
+                    <div class="about-card-icon">📐</div>
+                    <h2>Ngưỡng quyết định</h2>
+                    <p>Ngưỡng được chọn chỉ từ dự đoán out-of-fold trên tập huấn luyện nhằm ưu tiên độ nhạy ác tính ≥ 98% và tối đa hoá độ đặc hiệu.</p>
+                </article>
+                <article class="card">
+                    <div class="about-card-icon">🔒</div>
+                    <h2>Quyền riêng tư</h2>
+                    <p>Không nhập dữ liệu nhận dạng. Lịch sử chỉ lưu 30 đặc trưng số, kết quả, xác suất, ngưỡng và phiên bản mô hình. Dữ liệu được phân tách theo người dùng.</p>
+                </article>
+                <article class="card warning-card">
+                    <div class="about-card-icon">🚫</div>
+                    <h2>Không dùng để điều trị</h2>
+                    <p>Không trì hoãn, thay đổi hoặc bắt đầu điều trị dựa trên kết quả của ứng dụng này. Hãy trao đổi với chuyên gia y tế có thẩm quyền.</p>
+                </article>
+            </div>
+
+            <!-- Tech stack detail -->
+            <article class="card" style="margin-top: 1rem;">
+                <p class="eyebrow">Công nghệ sử dụng</p>
+                <h2>Stack kỹ thuật</h2>
+                <div class="tech-stack" style="margin-top: .9rem;">
+                    <span class="tech-badge">Python 3.12</span>
+                    <span class="tech-badge">FastAPI</span>
+                    <span class="tech-badge">scikit-learn</span>
+                    <span class="tech-badge">PostgreSQL</span>
+                    <span class="tech-badge">SQLAlchemy</span>
+                    <span class="tech-badge">JWT Auth</span>
+                    <span class="tech-badge">Render</span>
+                    <span class="tech-badge">GitHub Actions</span>
+                    <span class="tech-badge">Vanilla JS</span>
+                    <span class="tech-badge">CSS Grid</span>
+                </div>
+            </article>
+
+            <!-- Availability notice -->
+            <article class="card" style="margin-top: 1rem;">
+                <p class="eyebrow">Triển khai</p>
+                <h2>Khả dụng dịch vụ</h2>
+                <p style="color: var(--muted); margin: .5rem 0 0;">
+                    Gói miễn phí có thể ngủ khi không hoạt động. API sẽ đánh thức dịch vụ dữ liệu;
+                    dự đoán vẫn được trả về nếu phần lưu lịch sử tạm thời không sẵn sàng.
+                </p>
+            </article>
         </section>
+
     </main>
 
-    <footer><span>Breast Cancer SVM · Project 2</span><span>Mô hình giáo dục — không phải thiết bị y tế</span></footer>
+    <footer>
+        <span>Breast Cancer SVM · Dự án 2 · Học máy nâng cao</span>
+        <span>Mô hình giáo dục — không phải thiết bị y tế</span>
+    </footer>
 
+    <!-- ── Scroll to top ──────────────────────────────────── -->
+    <button id="scroll-top" type="button" aria-label="Cuộn lên đầu trang">↑</button>
+
+    <!-- ── Auth overlay ───────────────────────────────────── -->
     <div id="auth-overlay" class="auth-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <div class="auth-card">
             <button id="close-auth" class="icon-button" type="button" aria-label="Đóng">×</button>
@@ -192,8 +421,17 @@
             <h2 id="auth-title">Đăng nhập</h2>
             <p id="auth-subtitle">Dùng tài khoản chung để lưu lịch sử riêng tư.</p>
             <form id="auth-form" novalidate>
-                <label>Email<input id="auth-email" type="email" autocomplete="email" required></label>
-                <label>Mật khẩu<span class="password-wrap"><input id="auth-password" type="password" autocomplete="current-password" minlength="8" required><button id="toggle-password" type="button" aria-label="Hiện mật khẩu">Hiện</button></span></label>
+                <label>
+                    Email
+                    <input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com">
+                </label>
+                <label>
+                    Mật khẩu
+                    <span class="password-wrap">
+                        <input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="Tối thiểu 8 ký tự">
+                        <button id="toggle-password" type="button" aria-label="Hiện mật khẩu">Hiện</button>
+                    </span>
+                </label>
                 <div id="auth-error" class="form-message" role="alert"></div>
                 <button id="auth-submit" class="button button-primary button-full" type="submit">Đăng nhập</button>
             </form>
@@ -201,6 +439,7 @@
         </div>
     </div>
 
+    <!-- ── Toast ──────────────────────────────────────────── -->
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
