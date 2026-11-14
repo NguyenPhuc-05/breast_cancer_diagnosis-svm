@@ -4,6 +4,7 @@ const CLIENT_ID = 'project-two-api';
 const TOKEN_KEY = 'bc_auth_token';
 const EMAIL_KEY = 'bc_auth_email';
 const OWNER_KEY = 'bc_auth_owner';
+const THEME_KEY = 'bc_theme';
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '']);
 const isLocal = LOCAL_HOSTS.has(window.location.hostname);
 const deployment = window.BC_DEPLOYMENT || {};
@@ -40,7 +41,21 @@ const FEATURE_GROUPS = [
     },
 ];
 
+const RADAR_FEATURES = [
+    { name: 'mean radius', label: 'Bán kính' },
+    { name: 'mean texture', label: 'Độ nhám' },
+    { name: 'mean perimeter', label: 'Chu vi' },
+    { name: 'mean area', label: 'Diện tích' },
+    { name: 'mean smoothness', label: 'Độ mịn' },
+    { name: 'mean compactness', label: 'Độ đặc' },
+    { name: 'mean concavity', label: 'Độ lõm' },
+    { name: 'mean concave points', label: 'Điểm lõm' },
+    { name: 'mean symmetry', label: 'Đối xứng' },
+    { name: 'mean fractal dimension', label: 'Fractal' },
+];
+
 const FEATURE_NAMES = FEATURE_GROUPS.flatMap((group) => group.features);
+
 const BENIGN_SAMPLE = {
     'mean radius': 13.54, 'mean texture': 14.36, 'mean perimeter': 87.46,
     'mean area': 566.3, 'mean smoothness': 0.09779, 'mean compactness': 0.08129,
@@ -56,6 +71,7 @@ const BENIGN_SAMPLE = {
     'worst concavity': 0.239, 'worst concave points': 0.1288,
     'worst symmetry': 0.2977, 'worst fractal dimension': 0.07259,
 };
+
 const MALIGNANT_SAMPLE = {
     'mean radius': 17.99, 'mean texture': 10.38, 'mean perimeter': 122.8,
     'mean area': 1001, 'mean smoothness': 0.1184, 'mean compactness': 0.2776,
@@ -79,11 +95,14 @@ let authMode = 'login';
 let metadata = null;
 let metricsPayload = null;
 let toastTimer = null;
+let lastPredictionResult = null;
+let lastPredictionFeatures = null;
 
 const byId = (id) => document.getElementById(id);
 const percent = (value, digits = 1) => `${(Number(value) * 100).toFixed(digits)}%`;
 const number = (value, digits = 3) => Number(value).toFixed(digits);
 
+/* ── JWT & Theme ────────────────────────────────────────── */
 function parseJwt(token) {
     try {
         const body = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -96,15 +115,48 @@ function parseJwt(token) {
     }
 }
 
-function showToast(message) {
+function initTheme() {
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+    setTheme(savedTheme, false);
+}
+
+function setTheme(theme, save = true) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const toggleBtn = byId('theme-toggle');
+    if (toggleBtn) {
+        toggleBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+        toggleBtn.setAttribute('title', theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối');
+    }
+    if (save) {
+        localStorage.setItem(THEME_KEY, theme);
+    }
+    if (lastPredictionFeatures) {
+        drawRadarChart(lastPredictionFeatures, lastPredictionResult);
+    }
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    setTheme(next, true);
+}
+
+/* ── Toast ──────────────────────────────────────────────── */
+function showToast(message, type = 'info') {
     const toast = byId('toast');
+    if (!toast) return;
     toast.textContent = message;
-    toast.classList.add('is-visible');
+    toast.className = 'toast is-visible';
+    if (type === 'success') toast.classList.add('is-success');
+    if (type === 'warning') toast.classList.add('is-warning');
     window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => toast.classList.remove('is-visible'), 3200);
+    toastTimer = window.setTimeout(() => {
+        toast.classList.remove('is-visible');
+    }, 3400);
 }
 
 function setMessage(element, message, success = false) {
+    if (!element) return;
     element.textContent = message || '';
     element.classList.toggle('is-success', Boolean(success));
 }
@@ -152,13 +204,13 @@ async function parseError(response) {
             if (parts.length) return parts.join('. ');
         }
     } catch {
-        // Keep a generic error for non-JSON upstream responses.
+        // Fallback generic
     }
     return `Yêu cầu thất bại (${response.status}).`;
 }
 
 async function apiFetch(path, options = {}) {
-    if (!API_BASE) throw new Error('Thiếu BC_API_URL trong cấu hình triển khai.');
+    if (!API_BASE) throw new Error('Thiếu cấu hình API_BASE.');
     const response = await fetch(`${API_BASE}${path}`, {
         ...options,
         headers: authHeaders(options.headers || {}),
@@ -166,16 +218,17 @@ async function apiFetch(path, options = {}) {
     if (response.status === 401 && authToken) {
         logout(false);
         openAuth();
-        showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
     }
     return response;
 }
 
 async function idpFetch(path, options = {}) {
-    if (!IDP_BASE) throw new Error('Thiếu IDP_API_URL trong cấu hình triển khai.');
+    if (!IDP_BASE) throw new Error('Thiếu cấu hình IDP_BASE.');
     return fetch(`${IDP_BASE}${path}`, options);
 }
 
+/* ── Tabs ───────────────────────────────────────────────── */
 function switchTab(name) {
     if ((name === 'history' || name === 'profile') && !authToken) {
         openAuth();
@@ -233,7 +286,9 @@ function logout(notify = true) {
     localStorage.removeItem(EMAIL_KEY);
     localStorage.removeItem(OWNER_KEY);
     updateAuthUi();
-    if (['history', 'profile', 'admin'].includes(window.location.hash.slice(1))) switchTab('predict');
+    if (['history', 'profile', 'admin'].includes(window.location.hash.slice(1))) {
+        switchTab('predict');
+    }
     if (notify) showToast('Đã đăng xuất khỏi thiết bị này.');
 }
 
@@ -292,7 +347,7 @@ async function submitAuth(event) {
             saveSession(payload.access_token, payload.user || {});
             closeAuth();
             byId('auth-password').value = '';
-            showToast('Đăng nhập thành công.');
+            showToast('Đăng nhập thành công.', 'success');
         }
     } catch (error) {
         setMessage(byId('auth-error'), error.message || 'Identity Service tạm thời không sẵn sàng.');
@@ -302,8 +357,10 @@ async function submitAuth(event) {
     }
 }
 
+/* ── Features form ──────────────────────────────────────── */
 function renderFeatureInputs() {
     const container = byId('feature-groups');
+    if (!container) return;
     container.replaceChildren();
     FEATURE_GROUPS.forEach((group) => {
         const fieldset = document.createElement('fieldset');
@@ -344,17 +401,23 @@ function applyFeatureRanges(ranges) {
         if (!bounds) return;
         const input = document.querySelector(`[name="${feature}"]`);
         const hint = document.querySelector(`[data-range-for="${feature}"]`);
-        input.min = bounds.minimum;
-        input.max = bounds.maximum;
-        hint.textContent = `${bounds.minimum} – ${bounds.maximum}`;
+        if (input) {
+            input.min = bounds.minimum;
+            input.max = bounds.maximum;
+        }
+        if (hint) {
+            hint.textContent = `${bounds.minimum} – ${bounds.maximum}`;
+        }
     });
 }
 
 function loadSample(sample) {
     FEATURE_NAMES.forEach((feature) => {
         const input = document.querySelector(`[name="${feature}"]`);
-        input.value = sample[feature];
-        input.removeAttribute('aria-invalid');
+        if (input) {
+            input.value = sample[feature];
+            input.removeAttribute('aria-invalid');
+        }
     });
     setMessage(byId('form-error'), 'Đã nạp mẫu minh hoạ.', true);
 }
@@ -364,6 +427,7 @@ function collectFeatures() {
     const invalid = [];
     FEATURE_NAMES.forEach((feature) => {
         const input = document.querySelector(`[name="${feature}"]`);
+        if (!input) return;
         const value = Number(input.value);
         const hasValue = input.value.trim() !== '';
         const inRange = !metadata?.feature_ranges?.[feature]
@@ -373,16 +437,187 @@ function collectFeatures() {
         if (valid) features[feature] = value;
         else invalid.push(feature);
     });
-    if (invalid.length) throw new Error(`Kiểm tra các trường: ${invalid.join(', ')}.`);
+    if (invalid.length) throw new Error(`Vui lòng kiểm tra các trường: ${invalid.slice(0, 5).join(', ')}${invalid.length > 5 ? '…' : ''}`);
     return features;
 }
 
-function renderPrediction(result) {
+/* ── Confetti Animation ─────────────────────────────────── */
+function fireConfetti() {
+    const canvas = byId('confetti-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    canvas.classList.add('is-active');
+
+    const particles = [];
+    const colors = ['#6c47e8', '#9d6ff5', '#0ea875', '#34d399', '#f59e0b', '#ec4899'];
+    for (let i = 0; i < 90; i++) {
+        particles.push({
+            x: canvas.width * 0.5 + (Math.random() - 0.5) * 200,
+            y: canvas.height * 0.4 + (Math.random() - 0.5) * 100,
+            vx: (Math.random() - 0.5) * 14,
+            vy: -Math.random() * 12 - 4,
+            size: Math.random() * 8 + 4,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            rotation: Math.random() * Math.PI * 2,
+            vRot: (Math.random() - 0.5) * 0.2,
+            alpha: 1,
+        });
+    }
+
+    let start = null;
+    function animate(ts) {
+        if (!start) start = ts;
+        const elapsed = ts - start;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let alive = false;
+        particles.forEach((p) => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.35; // gravity
+            p.rotation += p.vRot;
+            if (elapsed > 1200) {
+                p.alpha -= 0.02;
+            }
+            if (p.alpha > 0) {
+                alive = true;
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                ctx.fillStyle = p.color;
+                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                ctx.restore();
+            }
+        });
+
+        if (alive && elapsed < 3200) {
+            requestAnimationFrame(animate);
+        } else {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            canvas.classList.remove('is-active');
+        }
+    }
+    requestAnimationFrame(animate);
+}
+
+/* ── Radar Chart (Canvas) ───────────────────────────────── */
+function drawRadarChart(features, result) {
+    const wrap = byId('radar-wrap');
+    const canvas = byId('radar-canvas');
+    if (!wrap || !canvas) return;
+    wrap.classList.remove('is-hidden');
+
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const centerX = w / 2;
+    const centerY = h / 2 - 5;
+    const radius = Math.min(centerX, centerY) - 38;
+    const count = RADAR_FEATURES.length;
+    const angleStep = (Math.PI * 2) / count;
+
+    // Draw background rings
+    const rings = 4;
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 1;
+    for (let r = 1; r <= rings; r++) {
+        const curR = (radius / rings) * r;
+        ctx.beginPath();
+        for (let i = 0; i < count; i++) {
+            const angle = i * angleStep - Math.PI / 2;
+            const x = centerX + Math.cos(angle) * curR;
+            const y = centerY + Math.sin(angle) * curR;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+    }
+
+    // Draw axes & labels
+    ctx.fillStyle = isDark ? '#a59ec9' : '#6b7280';
+    ctx.font = '10px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let i = 0; i < count; i++) {
+        const angle = i * angleStep - Math.PI / 2;
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+
+        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+
+        // Label offset
+        const labelDistance = radius + 18;
+        const lx = centerX + Math.cos(angle) * labelDistance;
+        const ly = centerY + Math.sin(angle) * labelDistance;
+        ctx.fillText(RADAR_FEATURES[i].label, lx, ly);
+    }
+
+    // Normalize feature values (0.1 to 1.0)
+    const points = [];
+    RADAR_FEATURES.forEach((item, i) => {
+        const val = Number(features[item.name]) || 0;
+        const range = metadata?.feature_ranges?.[item.name];
+        let norm = 0.5;
+        if (range && range.maximum > range.minimum) {
+            norm = (val - range.minimum) / (range.maximum - range.minimum);
+            norm = Math.max(0.08, Math.min(1.0, norm));
+        }
+        const curR = radius * norm;
+        const angle = i * angleStep - Math.PI / 2;
+        points.push({
+            x: centerX + Math.cos(angle) * curR,
+            y: centerY + Math.sin(angle) * curR,
+        });
+    });
+
+    // Draw filled polygon
+    const isMalignant = result.predicted_label === 'malignant' || result.decision === 'malignant';
+    const strokeColor = isMalignant ? '#e8476c' : '#0ea875';
+    const fillColor = isMalignant ? 'rgba(232, 71, 108, 0.28)' : 'rgba(14, 168, 117, 0.28)';
+
+    ctx.beginPath();
+    points.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // Draw points
+    ctx.fillStyle = strokeColor;
+    points.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+    });
+}
+
+/* ── Render prediction ──────────────────────────────────── */
+function renderPrediction(result, features) {
+    lastPredictionResult = result;
+    lastPredictionFeatures = features;
     const malignant = result.predicted_label === 'malignant' || result.decision === 'malignant';
     const card = byId('result-card');
     byId('result-empty').classList.add('is-hidden');
     card.classList.remove('is-hidden');
     card.classList.toggle('is-malignant', malignant);
+
     byId('result-badge').textContent = malignant ? 'Cảnh báo ác tính' : 'Nghiêng về lành tính';
     byId('result-title').textContent = malignant ? 'Ác tính' : 'Lành tính';
     byId('result-decision').textContent = malignant
@@ -395,6 +630,16 @@ function renderPrediction(result) {
     byId('result-threshold').textContent = number(result.threshold, 4);
     byId('result-version').textContent = result.model_version;
     byId('result-warning').textContent = result.warning;
+
+    // Draw radar chart
+    if (features) {
+        drawRadarChart(features, result);
+    }
+
+    // Celebrate with confetti if benign
+    if (!malignant) {
+        fireConfetti();
+    }
 }
 
 async function submitPrediction(event) {
@@ -415,13 +660,14 @@ async function submitPrediction(event) {
             body: JSON.stringify({ features }),
         });
         if (!response.ok) throw new Error(await parseError(response));
-        renderPrediction(await response.json());
-        showToast('Đã hoàn tất dự đoán.');
+        const result = await response.json();
+        renderPrediction(result, features);
+        showToast('Đã hoàn tất phân tích mẫu.', 'success');
     } catch (error) {
         setMessage(byId('form-error'), error.message || 'Không thể dự đoán.');
     } finally {
         button.disabled = false;
-        button.textContent = 'Phân tích mẫu';
+        button.textContent = '🔬 Phân tích mẫu';
     }
 }
 
@@ -430,10 +676,34 @@ function resetPrediction() {
         document.querySelectorAll('#prediction-form input').forEach((input) => input.removeAttribute('aria-invalid'));
         byId('result-card').classList.add('is-hidden');
         byId('result-empty').classList.remove('is-hidden');
+        byId('radar-wrap').classList.add('is-hidden');
         setMessage(byId('form-error'), '');
+        lastPredictionResult = null;
+        lastPredictionFeatures = null;
     }, 0);
 }
 
+function copyPredictionResult() {
+    if (!lastPredictionResult) return;
+    const r = lastPredictionResult;
+    const label = r.predicted_label === 'malignant' ? 'Ác tính' : 'Lành tính';
+    const text = `[Kết quả phân tích Breast Cancer SVM]
+- Đánh giá: ${label}
+- Xác suất ác tính: ${percent(r.probability_malignant, 2)}
+- Xác suất lành tính: ${percent(r.probability_benign, 2)}
+- Ngưỡng quyết định: ${number(r.threshold, 4)}
+- Phiên bản mô hình: ${r.model_version}
+- Thời gian: ${new Date().toLocaleString('vi-VN')}
+* Lưu ý: Kết quả mang tính giáo dục, không thay thế chẩn đoán y khoa.`;
+
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Đã sao chép kết quả vào clipboard!', 'success');
+    }).catch(() => {
+        showToast('Không thể sao chép kết quả.', 'warning');
+    });
+}
+
+/* ── Health & Metadata ──────────────────────────────────── */
 async function checkHealthAndMetadata() {
     const status = byId('service-status');
     if (!API_BASE || !IDP_BASE) {
@@ -452,12 +722,24 @@ async function checkHealthAndMetadata() {
         status.className = 'status-pill is-online';
         byId('hero-threshold').textContent = number(health.threshold, 4);
         applyFeatureRanges(metadata.feature_ranges);
+
+        // Fetch metrics to populate hero sensitivity stat
+        apiFetch('/metrics').then(async (res) => {
+            if (res.ok) {
+                metricsPayload = await res.json();
+                const cvSens = metricsPayload.metrics?.oof_cross_validation?.sensitivity_malignant;
+                if (cvSens != null) {
+                    byId('hero-sensitivity').textContent = percent(cvSens, 1);
+                }
+            }
+        }).catch(() => {});
     } catch {
         status.textContent = 'API chưa sẵn sàng';
         status.className = 'status-pill is-offline';
     }
 }
 
+/* ── Metrics ────────────────────────────────────────────── */
 function metricCard(container, label, value) {
     const card = document.createElement('article');
     card.className = 'metric-card';
@@ -528,16 +810,16 @@ function renderMetrics(payload) {
     const cv = metrics.oof_cross_validation;
     const cards = byId('metric-cards');
     cards.replaceChildren();
-    metricCard(cards, 'Độ nhạy ác tính', test.sensitivity_malignant);
-    metricCard(cards, 'Độ đặc hiệu lành tính', test.specificity_benign);
-    metricCard(cards, 'ROC-AUC', test.roc_auc_malignant);
-    metricCard(cards, 'PR-AUC', test.pr_auc_malignant);
+    metricCard(cards, 'Độ nhạy ác tính (Test)', test.sensitivity_malignant);
+    metricCard(cards, 'Độ đặc hiệu lành tính (Test)', test.specificity_benign);
+    metricCard(cards, 'ROC-AUC (Test)', test.roc_auc_malignant);
+    metricCard(cards, 'PR-AUC (Test)', test.pr_auc_malignant);
     renderConfusionMatrix(test.confusion_matrix);
     const comparisons = byId('comparison-bars');
     comparisons.replaceChildren();
-    addComparison(comparisons, 'Độ chính xác', cv.accuracy, test.accuracy);
-    addComparison(comparisons, 'Độ nhạy', cv.sensitivity_malignant, test.sensitivity_malignant);
-    addComparison(comparisons, 'Độ đặc hiệu', cv.specificity_benign, test.specificity_benign);
+    addComparison(comparisons, 'Độ chính xác (Accuracy)', cv.accuracy, test.accuracy);
+    addComparison(comparisons, 'Độ nhạy ác tính (Sensitivity)', cv.sensitivity_malignant, test.sensitivity_malignant);
+    addComparison(comparisons, 'Độ đặc hiệu lành tính (Specificity)', cv.specificity_benign, test.specificity_benign);
     addComparison(comparisons, 'F1 ác tính', cv.f1_malignant, test.f1_malignant);
     byId('metrics-threshold').textContent = number(payload.threshold, 4);
     const selection = payload.threshold_selection || {};
@@ -546,16 +828,20 @@ function renderMetrics(payload) {
     details.replaceChildren();
     const params = metadata?.best_params || {};
     detailRow(details, 'Phiên bản', payload.model_version);
-    detailRow(details, 'Kernel', 'RBF');
-    detailRow(details, 'C', params.svc__C ?? params.C ?? '—');
-    detailRow(details, 'Gamma', params.svc__gamma ?? params.gamma ?? '—');
-    detailRow(details, 'scikit-learn', metadata?.sklearn_version || '—');
+    detailRow(details, 'Thuật toán', 'Support Vector Machine (SVC)');
+    detailRow(details, 'Kernel', 'RBF (Radial Basis Function)');
+    detailRow(details, 'Tham số C', params.svc__C ?? params.C ?? '1.0');
+    detailRow(details, 'Tham số Gamma', params.svc__gamma ?? params.gamma ?? 'scale');
+    detailRow(details, 'Thư viện', `scikit-learn ${metadata?.sklearn_version || '1.6+'}`);
     byId('metrics-loading').classList.add('is-hidden');
     byId('metrics-content').classList.remove('is-hidden');
 }
 
 async function loadMetrics() {
-    if (metricsPayload) return;
+    if (metricsPayload) {
+        renderMetrics(metricsPayload);
+        return;
+    }
     try {
         const response = await apiFetch('/metrics');
         if (!response.ok) throw new Error(await parseError(response));
@@ -570,6 +856,7 @@ async function loadMetrics() {
     }
 }
 
+/* ── History ────────────────────────────────────────────── */
 function renderHistory(records) {
     const body = byId('history-body');
     body.replaceChildren();
@@ -607,7 +894,7 @@ async function clearHistory() {
         if (!response.ok) throw new Error(await parseError(response));
         const payload = await response.json();
         renderHistory([]);
-        showToast(`Đã xoá ${payload.deleted ?? 0} bản ghi.`);
+        showToast(`Đã xoá ${payload.deleted ?? 0} bản ghi.`, 'success');
     } catch (error) {
         setMessage(byId('history-message'), error.message || 'Không thể xoá lịch sử.');
     }
@@ -628,7 +915,7 @@ async function exportHistory() {
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
-        showToast('Đã xuất tệp Excel.');
+        showToast('Đã xuất tệp Excel thành công!', 'success');
     } catch (error) {
         setMessage(byId('history-message'), error.message || 'Không thể xuất Excel.');
     } finally {
@@ -636,6 +923,7 @@ async function exportHistory() {
     }
 }
 
+/* ── Profile ────────────────────────────────────────────── */
 async function loadProfile() {
     if (!authToken) return;
     const jwtPayload = parseJwt(authToken) || {};
@@ -645,7 +933,7 @@ async function loadProfile() {
         if (response.ok) profile = { ...profile, ...(await response.json()) };
         else if (response.status === 401) logout(false);
     } catch {
-        showToast('Không thể cập nhật hồ sơ từ Identity Service.');
+        showToast('Không thể cập nhật hồ sơ từ Identity Service.', 'warning');
     }
     const email = profile.email || currentEmail || '—';
     byId('profile-email').textContent = email;
@@ -660,6 +948,7 @@ async function loadProfile() {
     }
 }
 
+/* ── Admin ──────────────────────────────────────────────── */
 function renderAdminUsers(users) {
     const body = byId('admin-users-body');
     body.replaceChildren();
@@ -709,6 +998,7 @@ async function loadAdmin() {
     }
 }
 
+/* ── Event Bindings ─────────────────────────────────────── */
 function bindEvents() {
     document.querySelectorAll('.tab-button').forEach((button) => {
         button.addEventListener('click', () => switchTab(button.dataset.tab));
@@ -729,6 +1019,8 @@ function bindEvents() {
         byId('toggle-password').textContent = showing ? 'Hiện' : 'Ẩn';
         byId('toggle-password').setAttribute('aria-label', showing ? 'Hiện mật khẩu' : 'Ẩn mật khẩu');
     });
+
+    byId('theme-toggle').addEventListener('click', toggleTheme);
     byId('prediction-form').addEventListener('submit', submitPrediction);
     byId('prediction-form').addEventListener('reset', resetPrediction);
     byId('load-benign').addEventListener('click', () => loadSample(BENIGN_SAMPLE));
@@ -736,10 +1028,37 @@ function bindEvents() {
     byId('clear-history').addEventListener('click', clearHistory);
     byId('export-history').addEventListener('click', exportHistory);
     byId('logout-button').addEventListener('click', () => logout());
-    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !byId('auth-overlay').classList.contains('is-hidden')) closeAuth(); });
+    byId('copy-result').addEventListener('click', copyPredictionResult);
+
+    // Scroll to top button
+    const scrollTopBtn = byId('scroll-top');
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 280) {
+            scrollTopBtn.classList.add('is-visible');
+        } else {
+            scrollTopBtn.classList.remove('is-visible');
+        }
+    });
+    scrollTopBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !byId('auth-overlay').classList.contains('is-hidden')) {
+            closeAuth();
+        }
+    });
+
+    // Resize listener for radar chart & confetti canvas
+    window.addEventListener('resize', () => {
+        if (lastPredictionFeatures) {
+            drawRadarChart(lastPredictionFeatures, lastPredictionResult);
+        }
+    });
 }
 
 function initialize() {
+    initTheme();
     renderFeatureInputs();
     bindEvents();
     updateAuthUi();
