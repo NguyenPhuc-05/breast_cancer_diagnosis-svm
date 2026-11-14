@@ -520,7 +520,7 @@ function fireConfetti() {
     canvas.style.display = 'block';
 
     const particles = [];
-    const colors = ['#593E67', '#84495F', '#B85B56', '#DE741C', '#FEA837', '#10b981'];
+    const colors = ['#087e8b', '#0284c7', '#0ea5e9', '#38bdf8', '#2dd4bf', '#10b981'];
     for (let i = 0; i < 90; i++) {
         particles.push({
             x: canvas.width * 0.5 + (Math.random() - 0.5) * 200,
@@ -591,7 +591,7 @@ function drawRadarChart(features, result) {
 
     // Rings
     const rings = 4;
-    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(89,62,103,0.1)';
+    ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(8, 126, 139, 0.12)';
     ctx.lineWidth = 1;
     for (let r = 1; r <= rings; r++) {
         const curR = (radius / rings) * r;
@@ -608,7 +608,7 @@ function drawRadarChart(features, result) {
     }
 
     // Axes & Labels
-    ctx.fillStyle = isDark ? '#a08aaa' : '#6e5570';
+    ctx.fillStyle = isDark ? '#7dd3fc' : '#42637a';
     ctx.font = '10px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -618,7 +618,7 @@ function drawRadarChart(features, result) {
         const x = cx + Math.cos(angle) * radius;
         const y = cy + Math.sin(angle) * radius;
 
-        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(89,62,103,0.1)';
+        ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(8, 126, 139, 0.12)';
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.lineTo(x, y);
