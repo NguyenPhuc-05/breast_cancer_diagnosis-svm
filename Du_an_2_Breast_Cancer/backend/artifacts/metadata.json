@@ -1,0 +1,290 @@
+{
+  "model_name": "breast-cancer-svm-rbf",
+  "model_version": "2.0.0",
+  "dataset": {
+    "name": "Breast Cancer Wisconsin Diagnostic",
+    "sample_count": 569,
+    "class_counts": {
+      "malignant": 212,
+      "benign": 357
+    }
+  },
+  "feature_names": [
+    "mean radius",
+    "mean texture",
+    "mean perimeter",
+    "mean area",
+    "mean smoothness",
+    "mean compactness",
+    "mean concavity",
+    "mean concave points",
+    "mean symmetry",
+    "mean fractal dimension",
+    "radius error",
+    "texture error",
+    "perimeter error",
+    "area error",
+    "smoothness error",
+    "compactness error",
+    "concavity error",
+    "concave points error",
+    "symmetry error",
+    "fractal dimension error",
+    "worst radius",
+    "worst texture",
+    "worst perimeter",
+    "worst area",
+    "worst smoothness",
+    "worst compactness",
+    "worst concavity",
+    "worst concave points",
+    "worst symmetry",
+    "worst fractal dimension"
+  ],
+  "feature_ranges": {
+    "mean radius": {
+      "minimum": 6.981,
+      "maximum": 28.11
+    },
+    "mean texture": {
+      "minimum": 9.71,
+      "maximum": 39.28
+    },
+    "mean perimeter": {
+      "minimum": 43.79,
+      "maximum": 188.5
+    },
+    "mean area": {
+      "minimum": 143.5,
+      "maximum": 2501.0
+    },
+    "mean smoothness": {
+      "minimum": 0.05263,
+      "maximum": 0.1634
+    },
+    "mean compactness": {
+      "minimum": 0.01938,
+      "maximum": 0.3454
+    },
+    "mean concavity": {
+      "minimum": 0.0,
+      "maximum": 0.4268
+    },
+    "mean concave points": {
+      "minimum": 0.0,
+      "maximum": 0.2012
+    },
+    "mean symmetry": {
+      "minimum": 0.106,
+      "maximum": 0.304
+    },
+    "mean fractal dimension": {
+      "minimum": 0.04996,
+      "maximum": 0.09744
+    },
+    "radius error": {
+      "minimum": 0.1115,
+      "maximum": 2.873
+    },
+    "texture error": {
+      "minimum": 0.3602,
+      "maximum": 4.885
+    },
+    "perimeter error": {
+      "minimum": 0.757,
+      "maximum": 21.98
+    },
+    "area error": {
+      "minimum": 6.802,
+      "maximum": 542.2
+    },
+    "smoothness error": {
+      "minimum": 0.001713,
+      "maximum": 0.03113
+    },
+    "compactness error": {
+      "minimum": 0.002252,
+      "maximum": 0.1354
+    },
+    "concavity error": {
+      "minimum": 0.0,
+      "maximum": 0.396
+    },
+    "concave points error": {
+      "minimum": 0.0,
+      "maximum": 0.05279
+    },
+    "symmetry error": {
+      "minimum": 0.007882,
+      "maximum": 0.07895
+    },
+    "fractal dimension error": {
+      "minimum": 0.0008948,
+      "maximum": 0.02984
+    },
+    "worst radius": {
+      "minimum": 7.93,
+      "maximum": 36.04
+    },
+    "worst texture": {
+      "minimum": 12.02,
+      "maximum": 49.54
+    },
+    "worst perimeter": {
+      "minimum": 50.41,
+      "maximum": 251.2
+    },
+    "worst area": {
+      "minimum": 185.2,
+      "maximum": 4254.0
+    },
+    "worst smoothness": {
+      "minimum": 0.07117,
+      "maximum": 0.2226
+    },
+    "worst compactness": {
+      "minimum": 0.02729,
+      "maximum": 1.058
+    },
+    "worst concavity": {
+      "minimum": 0.0,
+      "maximum": 1.252
+    },
+    "worst concave points": {
+      "minimum": 0.0,
+      "maximum": 0.291
+    },
+    "worst symmetry": {
+      "minimum": 0.1565,
+      "maximum": 0.6638
+    },
+    "worst fractal dimension": {
+      "minimum": 0.05504,
+      "maximum": 0.2075
+    }
+  },
+  "class_mapping": {
+    "0": "malignant",
+    "1": "benign"
+  },
+  "best_params": {
+    "svc__C": 10,
+    "svc__gamma": 0.01
+  },
+  "threshold": 0.3011367604952424,
+  "threshold_selection": {
+    "source": "out_of_fold_training_probabilities",
+    "target_sensitivity_malignant": 0.98,
+    "target_met": true,
+    "candidate_count": 457,
+    "selected_oof_sensitivity_malignant": 0.9823529411764705,
+    "selected_oof_specificity_benign": 0.9649122807017544
+  },
+  "metrics": {
+    "train": {
+      "sample_count": 455,
+      "accuracy": 0.9846153846153847,
+      "sensitivity_malignant": 0.9823529411764705,
+      "specificity_benign": 0.9859649122807017,
+      "precision_malignant": 0.9766081871345029,
+      "f1_malignant": 0.9794721407624634,
+      "roc_auc_malignant": 0.9982868937048504,
+      "pr_auc_malignant": 0.9978091337652308,
+      "confusion_matrix": {
+        "labels": [
+          "malignant",
+          "benign"
+        ],
+        "matrix": [
+          [
+            167,
+            3
+          ],
+          [
+            4,
+            281
+          ]
+        ],
+        "malignant_true_positive": 167,
+        "malignant_false_negative": 3,
+        "benign_false_positive": 4,
+        "benign_true_negative": 281
+      }
+    },
+    "oof_cross_validation": {
+      "sample_count": 455,
+      "accuracy": 0.9714285714285714,
+      "sensitivity_malignant": 0.9823529411764705,
+      "specificity_benign": 0.9649122807017544,
+      "precision_malignant": 0.943502824858757,
+      "f1_malignant": 0.962536023054755,
+      "roc_auc_malignant": 0.9958307533539732,
+      "pr_auc_malignant": 0.9947637372753944,
+      "confusion_matrix": {
+        "labels": [
+          "malignant",
+          "benign"
+        ],
+        "matrix": [
+          [
+            167,
+            3
+          ],
+          [
+            10,
+            275
+          ]
+        ],
+        "malignant_true_positive": 167,
+        "malignant_false_negative": 3,
+        "benign_false_positive": 10,
+        "benign_true_negative": 275
+      }
+    },
+    "test": {
+      "sample_count": 114,
+      "accuracy": 0.9473684210526315,
+      "sensitivity_malignant": 0.9761904761904762,
+      "specificity_benign": 0.9305555555555556,
+      "precision_malignant": 0.8913043478260869,
+      "f1_malignant": 0.9318181818181818,
+      "roc_auc_malignant": 0.9966931216931216,
+      "pr_auc_malignant": 0.9952314259036948,
+      "confusion_matrix": {
+        "labels": [
+          "malignant",
+          "benign"
+        ],
+        "matrix": [
+          [
+            41,
+            1
+          ],
+          [
+            5,
+            67
+          ]
+        ],
+        "malignant_true_positive": 41,
+        "malignant_false_negative": 1,
+        "benign_false_positive": 5,
+        "benign_true_negative": 67
+      }
+    },
+    "grid_search": {
+      "scoring": "recall_macro",
+      "best_cv_score": 0.9753353973168215,
+      "best_mean_train_score": 0.9875128998968007,
+      "folds": 5
+    }
+  },
+  "split": {
+    "test_size": 0.2,
+    "random_state": 42,
+    "stratified": true,
+    "train_samples": 455,
+    "test_samples": 114
+  },
+  "sklearn_version": "1.9.1",
+  "warning": "Educational use only; not a medical diagnosis. Do not use this result for treatment or other clinical decisions."
+}
