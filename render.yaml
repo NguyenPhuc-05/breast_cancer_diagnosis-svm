@@ -7,6 +7,11 @@ envVarGroups:
 services:
   - type: web
     name: bc-svm-data
+    buildFilter:
+      paths:
+        - Du_an_2_Breast_Cancer/database/**
+        - shared/**
+        - render.yaml
     runtime: python
     plan: free
     buildCommand: pip install -r Du_an_2_Breast_Cancer/database/requirements.txt
@@ -19,6 +24,11 @@ services:
 
   - type: web
     name: bc-svm-api
+    buildFilter:
+      paths:
+        - Du_an_2_Breast_Cancer/backend/**
+        - shared/**
+        - render.yaml
     runtime: python
     plan: free
     buildCommand: pip install -r Du_an_2_Breast_Cancer/backend/requirements.txt
